@@ -33,11 +33,51 @@
 <section id="app" class="wrap hidden"></section>
 <footer class="footer"><div class="wrap" style="display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap"><span class="brand"><span class="mark" style="width:30px;height:30px;font-size:18px">G</span><span>GLLØRD<small>AFRICA</small></span></span><span>Earn More. Grow Together. Get Rewarded.</span><span>© 2026 GLLØRD AFRICA · Prototype</span></div></footer>
 <div id="toast" class="toast hidden" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// Enter your Supabase Project URL and publishable key here.
+const SUPABASE_URL = "https://lhyujqrgtgwijqofuoho.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4ET4aXvbnsXoenOMCzTqMg_p5IMaG3Y";
+let supabaseClient = null;
+try { if (window.supabase && !SUPABASE_URL.includes("PASTE_") && !SUPABASE_PUBLISHABLE_KEY.includes("PASTE_")) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY); } catch (error) { console.error(error); }
 const state={balance:4750,pending:1200,total:8950,withdrawals:[{date:'Oct 24, 2026',amount:2500,bank:'Example Bank',status:'Pending'}],tasks:[{title:'Follow a partner social page',desc:'Follow the listed partner page and submit a screenshot.',reward:500,category:'Social Media',slots:5},{title:'Write a product review',desc:'Write a useful review of the listed partner product.',reward:1200,category:'Review',slots:7},{title:'Visit a partner website',desc:'Visit the campaign page and follow the stated instructions.',reward:300,category:'Other',slots:20}],submissions:[],notifications:[]};
 function toast(msg){let t=document.getElementById('toast');t.textContent=msg;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),3500)}
 function showPage(page){document.getElementById('home').classList.toggle('hidden',!['home'].includes(page));document.getElementById('app').classList.toggle('hidden',['home'].includes(page));if(page==='home')return;let app=document.getElementById('app');app.innerHTML=page==='signup'?auth('Create your account','Join GLLØRD AFRICA to explore eligible earning activities.','Sign Up'):page==='login'?auth('Welcome back','Log in to your account.','Log In'):page==='earn'?userApp('tasks'):page==='dashboard'?userApp('dashboard'):page==='withdrawals'?userApp('withdrawals'):page==='admin'?adminApp('overview'):page==='upload'?adminApp('upload'):page==='submissions'?adminApp('submissions'):page==='adminwithdrawals'?adminApp('withdrawals'):userApp('dashboard');window.scrollTo({top:0,behavior:'smooth'})}
-function auth(title,desc,button){return `<div class="section" style="max-width:520px;margin:auto"><div class="panel"><div class="eyebrow">GLLØRD AFRICA</div><h2>${title}</h2><p class="muted">${desc}</p><div class="form-grid"><div class="field full"><label>Full name</label><input placeholder="Enter your full name"></div><div class="field full"><label>Email address</label><input type="email" placeholder="you@example.com"></div><div class="field full"><label>Password</label><input type="password" placeholder="At least 8 characters"></div></div><div class="notice">Prototype only: account creation and login are not connected to a live authentication service.</div><button class="btn-primary" onclick="toast('Demo only — secure authentication must be connected before launch.')">${button}</button> <button class="btn-outline" onclick="showPage('home')">Back</button></div></div>`}
+function auth(title,desc,button){
+  const isSignup = button === 'Sign Up';
+  return `<div class="section" style="max-width:520px;margin:auto"><div class="panel"><div class="eyebrow">GLLØRD AFRICA</div><h2>${title}</h2><p class="muted">${desc}</p>
+  <form onsubmit="handleAuth(event,${isSignup})">
+  ${isSignup ? '<div class="field full"><label for="authName">Full name</label><input id="authName" autocomplete="name" required placeholder="Enter your full name"></div>' : ''}
+  <div class="field full"><label for="authEmail">Email address</label><input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+  <div class="field full" style="margin-top:12px"><label for="authPassword">Password</label><input id="authPassword" type="password" minlength="8" autocomplete="${isSignup ? 'new-password' : 'current-password'}" required placeholder="At least 8 characters"></div>
+  <div class="notice" id="authNotice">${supabaseClient ? 'Supabase configuration detected.' : 'Setup required: add your Supabase Project URL and publishable key in the script.'}</div>
+  <button class="btn-primary" type="submit">${button}</button></form>
+  <p class="muted" style="margin-top:14px">${isSignup ? 'Already registered?' : 'Need an account?'} <a href="#" style="color:var(--gold)" onclick="showPage('${isSignup ? 'login' : 'signup'}');return false">${isSignup ? 'Log in' : 'Sign up'}</a></p>
+  <button class="btn-outline" onclick="showPage('home')">Back</button></div></div>`;
+}
+async function handleAuth(event,isSignup){
+  event.preventDefault();
+  const notice=document.getElementById('authNotice');
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPassword').value;
+  const fullName=document.getElementById('authName')?.value.trim() || '';
+  if(!supabaseClient){notice.textContent='Supabase is not configured. Add your Project URL and publishable key near the top of this script.';return;}
+  const button=event.submitter;
+  if(button){button.disabled=true;button.textContent='Please wait…';}
+  try{
+    const result=isSignup
+      ? await supabaseClient.auth.signUp({email,password,options:{data:{full_name:fullName}}})
+      : await supabaseClient.auth.signInWithPassword({email,password});
+    if(result.error) throw result.error;
+    if(isSignup && !result.data.session){
+      notice.textContent='Account request created. Check your email to confirm your address, then log in.';
+    }else{
+      toast(isSignup?'Account created successfully.':'Logged in successfully.');
+      showPage('dashboard');
+    }
+  }catch(error){notice.textContent=error.message || 'Authentication failed. Check your details and try again.';}
+  finally{if(button){button.disabled=false;button.textContent=isSignup?'Sign Up':'Log In';}}
+}
 function side(active,admin=false){let links=admin?[['overview','Dashboard','admin'],['users','Users','admin'],['upload','Tasks','upload'],['submissions','Submissions','submissions'],['adminwithdrawals','Withdrawals','adminwithdrawals'],['notifications','Notifications','admin']]:[['dashboard','Dashboard','dashboard'],['tasks','Paid Tasks','earn'],['videos','Watch Videos','earn'],['referrals','Referrals','dashboard'],['affiliate','Affiliate Marketing','dashboard'],['withdrawals','Withdrawals','withdrawals'],['profile','Profile','dashboard']];return `<aside class="sidebar"><div class="brand side-brand"><span class="mark">G</span><span>GLLØRD<small>AFRICA</small></span></div>${links.map(l=>`<a class="side-link ${active===l[0]?'active':''}" href="#" onclick="showPage('${l[2]}')">${l[1]}</a>`).join('')}<a class="side-link" href="#" onclick="showPage('home')">← Public website</a></aside>`}
 function userApp(tab){let content=tab==='tasks'?`<div class="headrow"><div><h1>Paid Tasks</h1><div class="muted">Complete the available tasks and submit proof.</div></div><span class="pill">Demo tasks</span></div><div class="task-list">${state.tasks.map((t,i)=>`<div class="task"><div><h3>${t.title}</h3><p>${t.desc}</p><span class="badge">${t.category}</span></div><div class="right"><div class="reward">₦${t.reward.toLocaleString()}</div><button class="btn-primary small-btn" onclick="submitTask(${i})">Start task</button></div></div>`).join('')}</div>`:tab==='withdrawals'?`<div class="headrow"><div><h1>Withdrawals</h1><div class="muted">Request a bank transfer when your available balance reaches ₦2,000.</div></div><button class="btn-primary" onclick="requestWithdrawal()">Request Withdrawal</button></div><div class="panel"><h3>Withdrawal history</h3>${state.withdrawals.map(w=>`<div class="row"><div>${w.date}<small>${w.bank}</small></div><strong>₦${w.amount.toLocaleString()}</strong><span class="badge ${w.status==='Pending'?'pending':''}">${w.status}</span></div>`).join('')}</div>`:`<div class="headrow"><div><h1>Welcome back!</h1><div class="muted">Your GLLØRD AFRICA overview.</div></div><span class="pill">Demo account</span></div><div class="metric-grid"><div class="metric"><small>Available balance</small><strong class="positive">₦${state.balance.toLocaleString()}</strong><button class="btn-primary small-btn" onclick="showPage('withdrawals')">Withdraw</button></div><div class="metric"><small>Pending balance</small><strong>₦${state.pending.toLocaleString()}</strong></div><div class="metric"><small>Total earned</small><strong>₦${state.total.toLocaleString()}</strong></div></div><div class="split"><div class="panel"><h3>Quick actions</h3><div class="row"><div>Complete tasks<small>Submit work for review</small></div><button class="btn-outline small-btn" onclick="showPage('earn')">Explore</button></div><div class="row"><div>Watch videos<small>Eligible campaigns</small></div><span class="badge">Coming soon</span></div><div class="row"><div>Invite friends<small>Track referrals</small></div><button class="btn-outline small-btn" onclick="toast('Referral tracking will be connected to the database.')">View link</button></div></div><div class="panel"><h3>Recent activity</h3><div class="row"><div>Task reward approved<small>Demo activity</small></div><span class="reward">+₦700</span></div><div class="row"><div>Video campaign<small>Pending verification</small></div><span class="badge pending">Pending</span></div></div></div>`;return `<div class="app-shell">${side(tab==='tasks'?'tasks':tab)}<div class="main">${content}<div class="notice">Demo data only. Real balances, task approvals, and withdrawal requests must be stored and verified by the secure backend before launch.</div></div></div>`}
 function submitTask(i){let t=state.tasks[i];let proof=prompt('Demo submission for: '+t.title+'\\nEnter a short description or proof reference:');if(proof===null)return;state.submissions.push({title:t.title,proof,amount:t.reward,status:'Pending'});state.notifications.unshift('New task submission: '+t.title);toast('Demo submission recorded as pending review.');showPage('earn')}
